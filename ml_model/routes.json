@@ -1,0 +1,4 @@
+[
+  { "fee": 2, "exchange_rate": 83.2, "time": 1000, "reliability": 0.9 },
+  { "fee": 1.5, "exchange_rate": 84.0, "time": 1200, "reliability": 0.85 }
+]
