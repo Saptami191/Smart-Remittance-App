@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VirtuTrade - Virtual Stock Trading</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-blue-100 text-gray-800 font-sans min-h-screen">
+  <!-- Navbar -->
+  <nav class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+    <h1 class="text-3xl font-bold text-indigo-600">📈 VirtuTrade</h1>
+    <div class="text-lg">Balance: $<span id="balance">10000</span></div>
+  </nav>
+
+  <!-- Main Grid -->
+  <div class="p-6 grid md:grid-cols-3 gap-6">
+    <!-- Trade Panel -->
+    <div class="bg-white p-6 rounded-2xl shadow-xl col-span-1">
+      <h2 class="text-2xl font-bold mb-4">🔍 Trade Stocks</h2>
+      <input id="symbolInput" type="text" placeholder="e.g. AAPL" class="w-full p-3 rounded border mb-3">
+      <button onclick="getStockData()" class="w-full bg-indigo-500 text-white py-2 rounded hover:bg-indigo-600 transition">Get Stock</button>
+      <div id="stockInfo" class="mt-4 text-sm text-gray-700"></div>
+
+      <div class="mt-6">
+        <input type="number" id="quantity" placeholder="Quantity" class="w-full p-3 rounded border mb-3">
+        <div class="grid grid-cols-2 gap-3">
+          <button onclick="buyStock()" class="bg-green-500 text-white py-2 rounded hover:bg-green-600 transition">Buy</button>
+          <button onclick="sellStock()" class="bg-red-500 text-white py-2 rounded hover:bg-red-600 transition">Sell</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock Chart -->
+    <div class="bg-white p-6 rounded-2xl shadow-xl col-span-2">
+      <h2 class="text-2xl font-bold mb-4">📊 Stock Price Chart</h2>
+      <canvas id="priceChart" height="150"></canvas>
+      <div class="mt-6">
+        <canvas id="volumeChart" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- Portfolio -->
+    <div class="bg-white p-6 rounded-2xl shadow-xl col-span-3">
+      <h2 class="text-2xl font-bold mb-4">💼 Your Portfolio</h2>
+      <table class="w-full table-auto text-left">
+        <thead>
+          <tr class="border-b">
+            <th class="p-3">Symbol</th>
+            <th class="p-3">Qty</th>
+            <th class="p-3">Price</th>
+            <th class="p-3">Value</th>
+          </tr>
+        </thead>
+        <tbody id="portfolioTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Script -->
+  <script>
+    let balance = parseFloat(localStorage.getItem("balance")) || 10000;
+    let portfolio = JSON.parse(localStorage.getItem("portfolio")) || {};
+    let chart, volumeChart;
+
+    document.getElementById("balance").innerText = balance.toFixed(2);
+
+    async function fetchStock(symbol) {
+      try {
+        const res = await fetch(`https://api.twelvedata.com/time_series?symbol=${symbol}&interval=1day&outputsize=30&apikey=demo`);
+        const json = await res.json();
+        if (!json.values) throw new Error("Invalid symbol");
+        const latest = json.values[0];
+        return {
+          price: parseFloat(latest.close),
+          volume: parseInt(latest.volume),
+          data: json.values.map(x => ({ date: x.datetime, price: parseFloat(x.close), volume: parseInt(x.volume) })).reverse()
+        };
+      } catch (e) {
+        alert("Failed to fetch stock data.");
+        return null;
+      }
+    }
+
+    async function getStockData() {
+      const symbol = document.getElementById("symbolInput").value.toUpperCase();
+      const result = await fetchStock(symbol);
+      if (!result) return;
+
+      document.getElementById("stockInfo").innerHTML = `
+        <div><strong>Symbol:</strong> ${symbol}</div>
+        <div><strong>Price:</strong> $${result.price.toFixed(2)}</div>
+        <div><strong>Volume:</strong> ${result.volume}</div>
+      `;
+
+      drawCharts(symbol, result.data);
+    }
+
+    function drawCharts(symbol, data) {
+      const ctx1 = document.getElementById("priceChart").getContext("2d");
+      const ctx2 = document.getElementById("volumeChart").getContext("2d");
+
+      const labels = data.map(d => d.date);
+      const prices = data.map(d => d.price);
+      const volumes = data.map(d => d.volume);
+
+      if (chart) chart.destroy();
+      if (volumeChart) volumeChart.destroy();
+
+      chart = new Chart(ctx1, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: `${symbol} Price`,
+            data: prices,
+            borderColor: '#6366f1',
+            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+            tension: 0.4
+          }]
+        }
+      });
+
+      volumeChart = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: `${symbol} Volume`,
+            data: volumes,
+            backgroundColor: '#a5b4fc'
+          }]
+        }
+      });
+    }
+
+    function buyStock() {
+      const symbol = document.getElementById("symbolInput").value.toUpperCase();
+      const qty = parseInt(document.getElementById("quantity").value);
+      if (!symbol || !qty) return;
+      fetchStock(symbol).then(res => {
+        const cost = qty * res.price;
+        if (balance >= cost) {
+          balance -= cost;
+          portfolio[symbol] = (portfolio[symbol] || 0) + qty;
+          update();
+          alert(`Bought ${qty} shares of ${symbol}`);
+        } else {
+          alert("Insufficient balance");
+        }
+      });
+    }
+
+    function sellStock() {
+      const symbol = document.getElementById("symbolInput").value.toUpperCase();
+      const qty = parseInt(document.getElementById("quantity").value);
+      if (!symbol || !qty || !portfolio[symbol] || portfolio[symbol] < qty) return alert("Not enough shares");
+      fetchStock(symbol).then(res => {
+        const value = qty * res.price;
+        balance += value;
+        portfolio[symbol] -= qty;
+        if (portfolio[symbol] === 0) delete portfolio[symbol];
+        update();
+        alert(`Sold ${qty} shares of ${symbol}`);
+      });
+    }
+
+    function update() {
+      localStorage.setItem("balance", balance);
+      localStorage.setItem("portfolio", JSON.stringify(portfolio));
+      document.getElementById("balance").innerText = balance.toFixed(2);
+      renderPortfolio();
+    }
+
+    async function renderPortfolio() {
+      const table = document.getElementById("portfolioTable");
+      table.innerHTML = "";
+      for (let symbol in portfolio) {
+        const qty = portfolio[symbol];
+        const res = await fetchStock(symbol);
+        if (!res) continue;
+        const row = `
+          <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">${symbol}</td>
+            <td class="p-3">${qty}</td>
+            <td class="p-3">$${res.price.toFixed(2)}</td>
+            <td class="p-3">$${(res.price * qty).toFixed(2)}</td>
+          </tr>
+        `;
+        table.innerHTML += row;
+      }
+    }
+
+    renderPortfolio();
+  </script>
+</body>
+</html>
