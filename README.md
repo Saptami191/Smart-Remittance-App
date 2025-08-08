@@ -59,7 +59,7 @@ SmartRemit/
 bash
 Copy
 Edit
-git clone https://github.com/yourusername/SmartRemit.git
+git clone [(https://github.com/Saptami191/Smart-Remit.git]
 cd SmartRemit
 2️⃣ Install Backend Dependencies
 bash
@@ -125,6 +125,7 @@ Security: AI-driven fraud prevention keeps users safe.
 
 📜 License
 This project is licensed under the MIT License.
+
 
 
 
