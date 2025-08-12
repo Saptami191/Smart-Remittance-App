@@ -113,7 +113,8 @@ Financial Inclusion: Empowers users in rural & developing regions.
 Cost Savings: Helps people save up to 15% per transaction.
 
 Security: AI-driven fraud prevention keeps users safe.
-
+📄 **Project Flowchart**  
+[View SmartRemit Flowchart (PDF)](smartremit_flowchart.pdf)  
 👥 Team
 [Saptami Biswas] – Backend & ML Integration
 
@@ -125,6 +126,7 @@ Security: AI-driven fraud prevention keeps users safe.
 
 📜 License
 This project is licensed under the MIT License.
+
 
 
 
