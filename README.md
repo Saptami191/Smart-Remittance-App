@@ -1,126 +1,145 @@
-💱 SmartRemit — AI-Powered Remittance Route Optimizer
-🌍 Overview
-SmartRemit is an AI-driven remittance optimization platform designed for emerging markets.
-It helps users send money faster, cheaper, and more securely by selecting the best remittance route in real-time.
+# 💱 SmartRemit — AI-Powered Remittance Optimizer
 
-The platform combines:
+## 🌍 Overview
 
-Dynamic route optimization
+SmartRemit is a full-stack fintech application that helps users decide the **best time to send money internationally** using AI-driven currency forecasting and optimization.
 
-Currency rate forecasting
+It provides actionable recommendations like:
+👉 *Send now* or *Wait for better rate*
+along with **expected monetary gain**
 
-Fraud detection
+---
 
-NLP-powered customer assistance
+## 🚀 Live Demo
 
-This ensures maximum savings for senders and efficient delivery for receivers.
+* 🌐 Frontend: https://smart-remittance-app.vercel.app
+* ⚙️ Backend API: https://smart-remittance-app-1.onrender.com
 
-🚀 Key Features
-🔹 Real-Time Remittance Route Optimization
-Uses Random Forest ML models to determine the cheapest & fastest transfer route.
+---
 
-Considers exchange rates, fees, transfer time, and reliability.
+## ⚙️ Features
 
-🔹 Currency Rate Forecasting
-Built with Facebook Prophet to predict near-future currency fluctuations.
+### 📈 Currency Forecasting
+* Predicts short-term exchange rate trends using **Prophet**
 
-Helps users choose the right time to send money.
+### 💡 Smart Recommendations
+* Suggests optimal timing for remittance
+* Calculates expected savings based on user amount
 
-🔹 Fraud Detection
-AI model flags suspicious transfers to protect users from scams and laundering activities.
+### 🔐 Authentication
+* JWT-based login/signup
+* Secure password hashing (bcrypt)
 
-🔹 Multilingual NLP Assistance
-Chatbot for 24/7 customer queries in multiple languages.
+### 📊 Interactive Dashboard
+* Visual charts for currency trends
+* Dynamic updates based on user input
 
-Uses AI for natural, human-like interactions.
+---
 
-🛠️ Tech Stack
-Component	Technology
-Frontend	HTML, CSS, JavaScript
-Backend	Node.js, Express.js
-Database	MongoDB
-Machine Learning	Python (Scikit-learn, Prophet, Pandas, NumPy)
-Integration	REST APIs
-Deployment	Render / Vercel / Railway
+## 🛠️ Tech Stack
 
-📂 Project Structure
-graphql
-Copy
-Edit
-SmartRemit/
+| Layer      | Technology                     |
+| ---------- | ------------------------------ |
+| Frontend   | HTML, CSS, JavaScript          |
+| Backend    | Node.js, Express               |
+| Database   | MongoDB Atlas                  |
+| ML         | Python (Prophet, Scikit-learn) |
+| Deployment | Vercel + Render                |
+
+---
+
+## 🏗️ Architecture
+
+Frontend (Vercel)
+→ Backend API (Render)
+→ MongoDB Atlas
+→ ML Service (Python - local / in progress)
+
+---
+
+## 📂 Project Structure
+
+```id="srm6pa"
+Smart-Remittance-App/
 │
-├── backend/         # Node.js API for frontend & ML model connection
-├── ml-models/       # ML scripts for route prediction & rate forecasting
-├── frontend/        # Web UI files
-├── dataset/         # Training datasets
+├── backend/        # Express API
+├── ml_service/     # Python ML models
+├── frontend/       # UI files
 └── README.md
-⚙️ Installation & Setup
-1️⃣ Clone the Repository
-bash
-Copy
-Edit
-git clone [(https://github.com/Saptami191/Smart-Remit.git]
-cd SmartRemit
-2️⃣ Install Backend Dependencies
-bash
-Copy
-Edit
+```
+
+---
+
+## ⚠️ Current Limitations
+
+* ML service is **not fully deployed yet**
+* Some endpoints may not work in production
+* Focus is on core recommendation system
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome!
+
+### Areas where help is needed:
+* 🚀 Deploy ML service (Python API)
+* 🎨 Improve frontend UI/UX
+* ⚙️ API error handling & optimization
+
+### Steps to contribute:
+1. Fork the repository
+2. Create a new branch
+3. Make changes
+4. Submit a Pull Request
+
+---
+
+## 🧪 Local Setup
+
+```bash id="1q4c6g"
+git clone https://github.com/Saptami191/Smart-Remittance-App.git
+cd Smart-Remittance-App
+```
+
+### Backend
+
+```bash id="5lmt4z"
 cd backend
 npm install
-3️⃣ Install ML Model Dependencies
-bash
-Copy
-Edit
-cd ../ml-models
+node app.js
+```
+
+### ML Service
+
+```bash id="v2n1jk"
+cd ../ml_service
 pip install -r requirements.txt
-4️⃣ Start Backend
-bash
-Copy
-Edit
-cd ../backend
-node server.js
-5️⃣ Run ML Model API
-bash
-Copy
-Edit
-cd ../ml-models
-python app.py
-6️⃣ Open Frontend in Browser
-pgsql
-Copy
-Edit
-Open frontend/index.html
-📊 AI Model Details
-Remittance Route Classifier:
+python main.py
+```
 
-Model: Random Forest
+### Frontend
 
-Input: Exchange rate, fees, transfer time, reliability score
+Open `index.html` or `dashboard.html` in browser
 
-Output: Best remittance provider
+---
 
-Currency Rate Forecaster:
+## 🎯 Key Highlights
 
-Model: Facebook Prophet
+* End-to-end full-stack system
+* Real-world fintech use case
+* Personalized financial insights
+* Live deployed backend + frontend
 
-Input: Historical currency rates
+---
 
-Output: Predicted rates for next 7 days
+## 👩💻 Author
 
-🌟 Impact
-Financial Inclusion: Empowers users in rural & developing regions.
+**Saptami Biswas**
+Backend & ML Integration
 
-Cost Savings: Helps people save up to 15% per transaction.
+---
 
-Security: AI-driven fraud prevention keeps users safe.
-📄 **Project Flowchart**  
-[View SmartRemit Flowchart (PDF)](smartremit_flowchart.pdf)  
-[Saptami Biswas] – Backend & ML Integration
+## 📜 License
 
-📜 License
-This project is licensed under the MIT License.
-
-
-
-
-
+MIT License
