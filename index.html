@@ -97,8 +97,19 @@
                 <img src="image3.webp" alt="">
              </div>
         </div>
+    <div class="forecast-section" style="padding: 4rem 2.8rem; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+        <h2 style="font-size: 2.5rem; color: #1e293b; margin-bottom: 2rem;">🌍 Live Currency Rate Forecast</h2>
+        <p style="color: #64748b; margin-bottom: 2rem;">Powered by SmartRemit AI - Next 7 Days Prediction for USD/INR</p>
+        
+        <div id="forecast-container" class="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-4" style="display: flex; gap: 15px; flex-wrap: wrap;">
+            <!-- Loading skeleton or placeholder -->
+            <div style="padding: 20px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 140px; text-align: center;">
+                Loading...
+            </div>
+        </div>
+    </div>
 
-         <footer class="footer_bar">
+    <footer class="footer_bar">
     <nav class="footer_part">
         <div class="footer_div">
            <div class="para">
@@ -213,6 +224,32 @@
       careerdropdown .classList.remove('active');
     }
   });
+  // --- AI Forecast Integration ---
+  async function loadForecast() {
+    try {
+      const container = document.getElementById("forecast-container");
+      // Use absolute URL to backend local server
+      const res = await fetch("http://localhost:5000/api/forecast?currency=USDINR&days=7");
+      const data = await res.json();
+
+      if (!data.forecast) throw new Error("No forecast data");
+
+      container.innerHTML = data.forecast
+        .map(item => `
+          <div style="padding: 15px; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); border-left: 4px solid #6366f1; min-width: 120px; transition: transform 0.2s;">
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: bold;">${item.date}</div>
+            <div style="font-size: 1.4rem; color: #1e293b; font-weight: 700;">₹${item.rate.toFixed(2)}</div>
+          </div>
+        `)
+        .join("");
+    } catch (err) {
+      console.error("Forecast Error:", err);
+      document.getElementById("forecast-container").innerHTML = "<p style='color: red;'>Failed to load AI Forecast. Ensure servers and ML service are running.</p>";
+    }
+  }
+
+  // Load forecast on startup
+  loadForecast();
 </script>
 </body>
 </html>

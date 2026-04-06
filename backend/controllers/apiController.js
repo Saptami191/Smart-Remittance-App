@@ -1,49 +1,66 @@
-const { spawn } = require('child_process');
-const path = require('path');
+const axios = require('axios');
+const Prediction = require('../models/Prediction');
 
-exports.getBestRoute = (req, res) => {
-    const py = spawn('python', [path.join(__dirname, '../../ml_model/route_selector.py')]);
-    let result = '';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
-    py.stdin.write(JSON.stringify(req.body.routes));
-    py.stdin.end();
-
-    py.stdout.on('data', chunk => result += chunk);
-    py.stderr.on('data', err => console.error(`stderr: ${err}`));
-    py.on('close', () => {
-        try {
-            res.send({ bestRoute: JSON.parse(result) });
-        } catch (e) {
-            res.status(500).send({ error: 'Failed to parse best route result.' });
-        }
-    });
+exports.getBestRoute = async (req, res) => {
+    try {
+        const response = await axios.post(`${ML_SERVICE_URL}/predict-route`, req.body.routes);
+        res.send({ bestRoute: response.data });
+    } catch (error) {
+        console.error('ML Service Error (Route):', error.message);
+        res.status(500).send({ error: 'Failed to fetch best route from ML service.' });
+    }
 };
 
-exports.getForecast = (req, res) => {
-    const py = spawn('python', [path.join(__dirname, '../../ml_model/forecast.py')]);
-    let forecast = '';
-    py.stdout.on('data', data => forecast += data);
-    py.stderr.on('data', err => console.error(`stderr: ${err}`));
-    py.on('close', () => {
+exports.getForecast = async (req, res) => {
+    try {
+        const payload = {
+            from_curr: req.query.from || 'USD',
+            to_curr: req.query.to || 'INR',
+            amount: parseFloat(req.query.amount) || 1000.0,
+            days: parseInt(req.query.days) || 7
+        };
+        const response = await axios.post(`${ML_SERVICE_URL}/forecast`, payload);
+        const data = response.data;
+
+        // Persist to MongoDB History
         try {
-            res.send({ forecast: JSON.parse(forecast) });
-        } catch (e) {
-            res.status(500).send({ error: 'Failed to parse forecast data.' });
+            await Prediction.create({
+                pair: data.pair,
+                amount: data.amount,
+                recommendation: data.recommendation,
+                expected_gain_total: data.expected_gain_total,
+                best_day: data.best_day,
+                trend: data.trend
+            });
+        } catch (dbErr) {
+            console.error('History Error (MongoDB):', dbErr.message);
         }
-    });
+
+        res.send(data);
+    } catch (error) {
+        console.error('ML Service Error (Forecast):', error.message);
+        res.status(500).send({ error: 'Failed to fetch forecast from ML service.' });
+    }
 };
 
-exports.checkFraud = (req, res) => {
-    const transaction = JSON.stringify(req.body.transaction);
-    const py = spawn('python', [path.join(__dirname, '../../ml_model/detect_fraud.py'), transaction]);
-    let result = '';
-    py.stdout.on('data', data => result += data);
-    py.stderr.on('data', err => console.error(`stderr: ${err}`));
-    py.on('close', () => {
-        try {
-            res.send({ isFraud: result.trim() === 'True' });
-        } catch (e) {
-            res.status(500).send({ error: 'Failed to evaluate fraud result.' });
-        }
-    });
+exports.getHistory = async (req, res) => {
+    try {
+        const history = await Prediction.find().sort({ createdAt: -1 }).limit(10);
+        res.send({ history });
+    } catch (error) {
+        console.error('DB Error (History):', error.message);
+        res.status(500).send({ error: 'Failed to fetch prediction history.' });
+    }
+};
+
+exports.checkFraud = async (req, res) => {
+    try {
+        const response = await axios.post(`${ML_SERVICE_URL}/fraud-check`, req.body.transaction);
+        res.send(response.data);
+    } catch (error) {
+        console.error('ML Service Error (Fraud):', error.message);
+        res.status(500).send({ error: 'Failed to evaluate fraud status from ML service.' });
+    }
 };
