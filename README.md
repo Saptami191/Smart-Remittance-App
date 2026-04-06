@@ -115,14 +115,7 @@ Cost Savings: Helps people save up to 15% per transaction.
 Security: AI-driven fraud prevention keeps users safe.
 📄 **Project Flowchart**  
 [View SmartRemit Flowchart (PDF)](smartremit_flowchart.pdf)  
-👥 Team
 [Saptami Biswas] – Backend & ML Integration
-
-[Aradhya Dwivedi] – Frontend Development
-
-[Bikram Sadhukhan] – Data Collection & Model Training
-
-[Debdwaipayan Halder] - Backend  
 
 📜 License
 This project is licensed under the MIT License.
