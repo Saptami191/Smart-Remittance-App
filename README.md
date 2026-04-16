@@ -135,8 +135,7 @@ Open `index.html` or `dashboard.html` in browser
 
 ## 👩💻 Author
 
-**Saptami Biswas**
-Backend & ML Integration
+
 
 ---
 
