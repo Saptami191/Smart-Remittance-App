@@ -1,0 +1,266 @@
+body{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+.header{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+   
+   background: linear-gradient(90deg, #434343, #000000);
+    
+}
+.nav-bar{
+  
+   display: flex;
+   align-items: center;
+   justify-content: space-evenly;
+   flex: 1;
+   
+}
+.nav-bar a{
+        font-size: 20px;
+      color: #ffffff;
+      text-decoration: none;
+
+    }
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-toggle {
+      cursor: pointer;
+      font-size: 20px;
+     color: #ffffff;
+      
+      padding: 8px 12px;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background: white;
+      border: 1px solid #ccc;
+      min-width: 200px;
+      display: none;
+      z-index: 10;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .dropdown-menu a {
+      display: block;
+      font-size: 18px;
+      font-weight: 100;
+      padding: 10px;
+      text-decoration: none;
+      color: #333;
+    }
+
+    .dropdown-menu a:hover {
+      background-color: #f0f0f0;
+    }
+
+    .dropdown.active .dropdown-menu {
+      display: block;
+    }
+    .input-bar{
+        flex: 1;
+        
+    }
+    .input-bar input{
+        margin-left: 50px;
+      width: 100%;
+  max-width: 400px;
+  padding: 12px 16px;
+  border: 2px solid #ccc;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.3s ease;
+  outline: none;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  font-family: 'Poppins', sans-serif;
+    }
+
+    .input-bar input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.3);
+}
+.input-bar button{
+    padding: 12px 24px;
+  margin-left: 10px;
+  background: linear-gradient(135deg, #007bff, #00d4ff);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.4);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+    
+.input-bar button:focus{
+    background: linear-gradient(135deg, #0056b3, #009ecb);
+  box-shadow: 0 6px 12px rgba(0, 94, 179, 0.6);
+}
+.input-bar button:active{
+     background: linear-gradient(135deg, #00408a, #007ea0);
+  box-shadow: 0 2px 6px rgba(0, 64, 138, 0.7);
+  transform: translateY(2px);
+}
+
+.main {
+        height: 100vh;         
+  width: 100vw;      
+  overflow: hidden;      
+  position: relative;
+}
+
+/* Image covers entire main div */
+.main img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;     
+  display: block;        
+}
+.main button {
+  position: absolute;
+  top: 40%;
+  left: 29%;
+  padding: 20px 30px;
+  margin-left: 10px;
+  background: linear-gradient(135deg, #00c6ff, #0072ff); /* Updated */
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 29px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0, 120, 255, 0.4); /* subtle blue glow */
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.main button:focus {
+  background: linear-gradient(135deg, #005bea, #00c6fb); /* Lighter focus */
+  box-shadow: 0 6px 12px rgba(0, 140, 255, 0.6);
+}
+
+.main button:active {
+  background: linear-gradient(135deg, #004e92, #000428);
+  box-shadow: 0 2px 6px rgba(0, 100, 200, 0.7);
+  transform: translateY(2px);
+}
+
+.main-text{
+    position: absolute;
+    top: 15%;
+    left: 29%;
+    font-size: 48px;
+    color: white;
+}
+.main p{
+    margin: 0;
+}
+
+.portfolio{
+    background-color: #000000;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    margin-top: 0;
+}
+
+.heading p{
+    font-size: 48px;
+    text-align: center;
+    margin: 0;
+}
+
+.stock-features {
+  font-size: 20px;
+  line-height: 1.8;              /* Increases line height for readability */
+  list-style-type: disc;         /* Use bullet points */
+  padding-left: 30px;            /* Indent from left edge */
+  margin: 20px 0;                /* Top and bottom spacing */
+  color: #f1f1f1;                /* Light text color for dark backgrounds */
+  font-family: 'Poppins', sans-serif;
+}
+
+.stock-features li {
+  margin-bottom: 2rem;     
+  margin-left: 4rem;      /* Space between each list item */
+}
+
+.stock-features {
+  list-style: none;
+  padding-left: 0;
+}
+
+.stock-features li::before {
+  content: '✔';
+  color: #00c6ff;
+  font-weight: bold;
+  margin-right: 10px;
+}
+.folio-img img{
+    display: block;
+ transform: rotate(-5deg);     /* Tilt to the left */
+  transition: transform 0.3s ease;
+  display: block;
+  max-width: 100%;
+  height: 50rem;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+
+}
+
+.footer_part{
+    height: 30rem;
+    
+    width: 100%;
+    display: flex;
+    justify-content: space-evenly;
+    align-items:center ;
+    background-color:#3f3f3f;
+    color: #a7a4a4fb;
+   }
+
+   .footer_div{
+    height: 25rem;
+    width: 13rem;
+    
+
+   }
+   a{
+    display: block;
+    color: white;
+    font-size: 13px;
+    border: none;
+    text-decoration: none;
+    margin-bottom: 0.4rem;
+    font-weight: 700;
+   }
+   .para{
+    margin-top: 3rem;
+   
+
+   }
+   .anchor{
+    margin-top: 2rem;
+    color: white;
+    
+   }
+
+
+
+
+
+
+
+  
