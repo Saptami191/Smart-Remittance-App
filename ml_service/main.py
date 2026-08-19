@@ -48,7 +48,19 @@ async def health():
 async def ready():
     if not MODEL_PATH.exists() or not METADATA_PATH.exists():
         raise HTTPException(status_code=503, detail="Forecast model is not available")
-    return {"status": "ready"}
+    try:
+        metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Forecast model metadata is invalid") from exc
+    if metadata.get("status") != "promoted":
+        raise HTTPException(status_code=503, detail="No validated forecast model is promoted")
+    return {
+        "status": "ready",
+        "model_type": metadata.get("model_type"),
+        "model_version": metadata.get("model_version"),
+        "training_commit": metadata.get("training_commit"),
+        "training_end": metadata.get("training_end"),
+    }
 
 
 @app.post("/predict-route")
@@ -56,12 +68,7 @@ async def predict_route(routes: list[Route]):
     if not routes:
         raise HTTPException(status_code=400, detail="No routes provided")
     df = pd.DataFrame([r.model_dump() for r in routes])
-    df["score"] = df.apply(
-        lambda row: score_route(
-            row["fee"], row["exchange_rate"], row["time"], row["reliability"]
-        ),
-        axis=1,
-    )
+    df["score"] = df.apply(lambda row: score_route(row["fee"], row["exchange_rate"], row["time"], row["reliability"]), axis=1)
     return df.loc[df["score"].idxmax()].to_dict()
 
 
@@ -76,16 +83,14 @@ def get_forecast_model():
     global forecast_model, forecast_metadata
     if forecast_model is not None:
         return forecast_model
-
     if not MODEL_PATH.exists() or not METADATA_PATH.exists():
         raise HTTPException(status_code=503, detail="Forecast model is unavailable")
-
     try:
-        forecast_model = joblib.load(MODEL_PATH)
         forecast_metadata = json.loads(METADATA_PATH.read_text(encoding="utf-8"))
         if forecast_metadata.get("status") != "promoted":
             raise HTTPException(status_code=503, detail="No validated forecast model is promoted")
-        logger.info("Loaded %s forecast model", forecast_metadata.get("model_type"))
+        forecast_model = joblib.load(MODEL_PATH)
+        logger.info("Loaded %s forecast model version %s", forecast_metadata.get("model_type"), forecast_metadata.get("model_version"))
         return forecast_model
     except HTTPException:
         raise
@@ -98,29 +103,11 @@ def forecast_candidate(model, model_type: str, days: int) -> list[dict]:
     if model_type == "prophet":
         future = model.make_future_dataframe(periods=days, include_history=False, freq="B")
         forecast = model.predict(future)
-        return [
-            {
-                "date": row.ds.strftime("%Y-%m-%d"),
-                "rate": round(max(float(row.yhat), 0.0), 4),
-                "lower_bound": round(max(float(row.yhat_lower), 0.0), 4),
-                "upper_bound": round(max(float(row.yhat_upper), 0.0), 4),
-            }
-            for row in forecast.itertuples()
-        ]
-
+        return [{"date": row.ds.strftime("%Y-%m-%d"), "rate": round(max(float(row.yhat), 0.0), 4), "lower_bound": round(max(float(row.yhat_lower), 0.0), 4), "upper_bound": round(max(float(row.yhat_upper), 0.0), 4)} for row in forecast.itertuples()]
     if model_type in {"naive", "moving_average_7", "exponential_smoothing"}:
         value = float(model["value"])
         today = date.today()
-        return [
-            {
-                "date": (today + timedelta(days=offset)).isoformat(),
-                "rate": round(max(value, 0.0), 4),
-                "lower_bound": None,
-                "upper_bound": None,
-            }
-            for offset in range(1, days + 1)
-        ]
-
+        return [{"date": (today + timedelta(days=offset)).isoformat(), "rate": round(max(value, 0.0), 4), "lower_bound": None, "upper_bound": None} for offset in range(1, days + 1)]
     raise ValueError(f"Unsupported forecast model type: {model_type}")
 
 
@@ -129,55 +116,40 @@ async def forecast_rates(req: ForecastRequest = Body(...)):
     from_curr = req.from_curr.upper()
     to_curr = req.to_curr.upper()
     currency_pair = f"{from_curr}{to_curr}"
-
     model = get_forecast_model()
-    trained_pair = "".join(
-        [
-            str(forecast_metadata.get("from_currency", "")),
-            str(forecast_metadata.get("to_currency", "")),
-        ]
-    )
+    trained_pair = "".join([str(forecast_metadata.get("from_currency", "")), str(forecast_metadata.get("to_currency", ""))])
     if trained_pair and trained_pair != currency_pair:
         raise HTTPException(status_code=400, detail=f"Model is trained for {trained_pair}, not {currency_pair}")
-
     cache_key = f"{currency_pair}_{req.days}_{req.amount}"
     cached = forecast_cache.get(cache_key)
     if cached and cached["expiry"] > datetime.now():
         return cached["data"]
-
     try:
         model_type = forecast_metadata.get("model_type")
         clean_result = forecast_candidate(model, model_type, req.days)
         if not clean_result:
             raise RuntimeError("Forecast model returned no predictions")
-
         current_rate = clean_result[0]["rate"]
         best_match = max(clean_result, key=lambda item: item["rate"])
         expected_gain_per_unit = round(best_match["rate"] - current_rate, 4)
         expected_gain_total = round(expected_gain_per_unit * req.amount, 2)
         best_date = date.fromisoformat(best_match["date"])
         days_to_wait = max((best_date - date.today()).days, 0)
-
-        if expected_gain_per_unit > 0.05 and days_to_wait > 0:
-            recommendation = f"Wait {days_to_wait} days for better rate"
-        else:
-            recommendation = "Send now - rates are stable or declining"
-
+        recommendation = f"Wait {days_to_wait} days for better rate" if expected_gain_per_unit > 0.05 and days_to_wait > 0 else "Send now - rates are stable or declining"
         trend = "increasing" if clean_result[-1]["rate"] > clean_result[0]["rate"] else "stable"
         interval_width_pct = None
         bounds_available = [x for x in clean_result if x["lower_bound"] is not None and x["rate"] > 0]
         if bounds_available:
             widest = max(bounds_available, key=lambda item: item["rate"])
             interval_width_pct = (widest["upper_bound"] - widest["lower_bound"]) / widest["rate"] * 100
-
         confidence = None
         if interval_width_pct is not None:
             confidence = "High" if interval_width_pct <= 1 else "Medium" if interval_width_pct <= 3 else "Low"
-
         final_response = {
             "pair": f"{from_curr}/{to_curr}",
             "amount": req.amount,
             "model_type": model_type,
+            "model_version": forecast_metadata.get("model_version"),
             "best_day": best_match["date"],
             "expected_rate": best_match["rate"],
             "expected_gain_per_unit": expected_gain_per_unit,
