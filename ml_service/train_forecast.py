@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 
 import joblib
@@ -22,33 +24,24 @@ def load_data(path: str) -> pd.DataFrame:
     missing = required - set(df.columns)
     if missing:
         raise ValueError(f"Missing required columns: {sorted(missing)}")
-
     df = df[["date", "exchange_rate"]].copy()
     df["ds"] = pd.to_datetime(df.pop("date"), errors="coerce")
     df["y"] = pd.to_numeric(df.pop("exchange_rate"), errors="coerce")
     df = df.dropna().drop_duplicates("ds").sort_values("ds")
-
     if len(df) < 200:
         raise ValueError("At least 200 observations are required for training")
     if (df["y"] <= 0).any():
         raise ValueError("Exchange rates must be positive")
-
     return df[["ds", "y"]].reset_index(drop=True)
 
 
-def evaluate_window(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, float]:
+def evaluate_window(train: pd.DataFrame, test: pd.DataFrame) -> dict:
     actual = test["y"].to_numpy()
-
-    # Persistence baseline: next observations equal the latest observed rate.
     naive_pred = [train["y"].iloc[-1]] * len(test)
     naive_mae = mean_absolute_error(actual, naive_pred)
-
-    # Seven-observation moving-average baseline.
     window = min(7, len(train))
     moving_avg_pred = [train["y"].iloc[-window:].mean()] * len(test)
     moving_avg_mae = mean_absolute_error(actual, moving_avg_pred)
-
-    # Exponential smoothing with a fixed, reproducible alpha.
     alpha = 0.3
     level = float(train["y"].iloc[0])
     for value in train["y"].iloc[1:]:
@@ -70,8 +63,6 @@ def evaluate_window(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, float]
         "exponential_smoothing": float(exp_mae),
         "prophet": float(prophet_mae),
     }
-    winner = min(candidates, key=candidates.get)
-
     return {
         "observations": len(test),
         "mae": round(float(prophet_mae), 6),
@@ -79,7 +70,7 @@ def evaluate_window(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, float]
         "mape_percent": round(float(prophet_mape), 4),
         "naive_baseline_mae": round(float(naive_mae), 6),
         "candidate_mae": {name: round(value, 6) for name, value in candidates.items()},
-        "winner": winner,
+        "winner": min(candidates, key=candidates.get),
     }
 
 
@@ -88,48 +79,36 @@ def rolling_backtest(df: pd.DataFrame, folds: int, horizon: int) -> dict:
         raise ValueError("At least 2 backtest folds are required")
     if horizon < 5:
         raise ValueError("Backtest horizon must be at least 5 observations")
-
     minimum_training = 200
     required = minimum_training + folds * horizon
     if len(df) < required:
         raise ValueError(f"Need at least {required} observations")
 
-    results: list[dict] = []
+    results = []
     first_test_start = len(df) - folds * horizon
-
     for fold in range(folds):
         test_start = first_test_start + fold * horizon
         test_end = test_start + horizon
         train = df.iloc[:test_start].copy()
         test = df.iloc[test_start:test_end].copy()
         metrics = evaluate_window(train, test)
-        metrics.update(
-            {
-                "fold": fold + 1,
-                "train_end": train["ds"].iloc[-1].date().isoformat(),
-                "test_start": test["ds"].iloc[0].date().isoformat(),
-                "test_end": test["ds"].iloc[-1].date().isoformat(),
-            }
-        )
+        metrics.update({
+            "fold": fold + 1,
+            "train_end": train["ds"].iloc[-1].date().isoformat(),
+            "test_start": test["ds"].iloc[0].date().isoformat(),
+            "test_end": test["ds"].iloc[-1].date().isoformat(),
+        })
         results.append(metrics)
 
     candidates = ["naive", "moving_average_7", "exponential_smoothing", "prophet"]
-    aggregate = {
-        name: sum(item["candidate_mae"][name] for item in results) / len(results)
-        for name in candidates
-    }
-    fold_wins = {
-        name: sum(item["winner"] == name for item in results) for name in candidates
-    }
+    aggregate = {name: sum(item["candidate_mae"][name] for item in results) / len(results) for name in candidates}
+    fold_wins = {name: sum(item["winner"] == name for item in results) for name in candidates}
     winner = min(aggregate, key=aggregate.get)
-
     return {
         "folds": results,
         "fold_count": len(results),
         "horizon_observations": horizon,
-        "mean_candidate_mae": {
-            name: round(value, 6) for name, value in aggregate.items()
-        },
+        "mean_candidate_mae": {name: round(value, 6) for name, value in aggregate.items()},
         "fold_wins": fold_wins,
         "selected_candidate": winner,
         "beats_naive_baseline": bool(aggregate[winner] < aggregate["naive"]),
@@ -141,18 +120,32 @@ def train_selected_model(df: pd.DataFrame, selected: str):
         model = Prophet(daily_seasonality=True, interval_width=0.95)
         model.fit(df)
         return model
-    if selected in {"naive", "moving_average_7", "exponential_smoothing"}:
-        # Store parameters instead of pretending these baselines are ML models.
-        if selected == "naive":
-            return {"type": selected, "value": float(df["y"].iloc[-1])}
-        if selected == "moving_average_7":
-            return {"type": selected, "value": float(df["y"].iloc[-7:].mean())}
+    if selected == "naive":
+        return {"type": selected, "value": float(df["y"].iloc[-1])}
+    if selected == "moving_average_7":
+        return {"type": selected, "value": float(df["y"].iloc[-7:].mean())}
+    if selected == "exponential_smoothing":
         alpha = 0.3
         level = float(df["y"].iloc[0])
         for value in df["y"].iloc[1:]:
             level = alpha * float(value) + (1 - alpha) * level
         return {"type": selected, "alpha": alpha, "value": level}
     raise ValueError(f"Unknown model candidate: {selected}")
+
+
+def build_metadata(df: pd.DataFrame, backtest: dict, status: str, model_type: str | None, model_version: str | None = None) -> dict:
+    return {
+        "status": status,
+        "model_version": model_version,
+        "model_type": model_type,
+        "from_currency": "USD",
+        "to_currency": "INR",
+        "training_commit": os.getenv("GITHUB_SHA"),
+        "training_observations": len(df),
+        "training_start": df["ds"].min().date().isoformat(),
+        "training_end": df["ds"].max().date().isoformat(),
+        "backtest": backtest,
+    }
 
 
 def main() -> None:
@@ -165,27 +158,16 @@ def main() -> None:
     parser.add_argument("--from-currency", default="USD")
     parser.add_argument("--to-currency", default="INR")
     args = parser.parse_args()
-
     df = load_data(args.data)
     backtest = rolling_backtest(df, args.folds, args.horizon)
-
     print(json.dumps(backtest, indent=2))
 
     selected = backtest["selected_candidate"]
     if not backtest["beats_naive_baseline"]:
-        print("No candidate beats the naive baseline; no model will be promoted.")
-        metadata = {
-            "status": "rejected",
-            "model_type": None,
-            "from_currency": args.from_currency.upper(),
-            "to_currency": args.to_currency.upper(),
-            "training_observations": len(df),
-            "training_start": df["ds"].min().date().isoformat(),
-            "training_end": df["ds"].max().date().isoformat(),
-            "backtest": backtest,
-        }
+        metadata = build_metadata(df, backtest, "rejected", None)
         Path(args.metadata).parent.mkdir(parents=True, exist_ok=True)
         Path(args.metadata).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        print(json.dumps(metadata, indent=2))
         return
 
     model = train_selected_model(df, selected)
@@ -194,20 +176,12 @@ def main() -> None:
     model_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, model_path)
-
-    metadata = {
-        "status": "promoted",
-        "model_type": selected,
-        "from_currency": args.from_currency.upper(),
-        "to_currency": args.to_currency.upper(),
-        "training_observations": len(df),
-        "training_start": df["ds"].min().date().isoformat(),
-        "training_end": df["ds"].max().date().isoformat(),
-        "backtest": backtest,
-    }
+    model_sha256 = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    model_version = f"{os.getenv('GITHUB_SHA', 'local')[:12]}-{model_sha256[:12]}"
+    metadata = build_metadata(df, backtest, "promoted", selected, model_version)
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(json.dumps(metadata, indent=2))
-    print(f"Promoted {selected} model to {model_path}")
+    print(f"Promoted {selected} model to {model_path} (version={model_version})")
 
 
 if __name__ == "__main__":
