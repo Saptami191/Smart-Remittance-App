@@ -11,6 +11,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Show training revision
+        run: |
+          echo "Training revision: $(git rev-parse HEAD)"
+          grep -n "rolling_backtest\|validation_fraction" ml_service/train_forecast.py || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
