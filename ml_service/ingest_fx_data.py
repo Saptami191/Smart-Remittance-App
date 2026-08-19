@@ -1,4 +1,4 @@
-"""Fetch historical FX data from Frankfurter and save it for training."""
+"""Fetch historical FX data from Frankfurter v2 and save it for training."""
 
 from __future__ import annotations
 
@@ -9,25 +9,33 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE_URL = "https://api.frankfurter.dev/v1"
+BASE_URL = "https://api.frankfurter.dev/v2/rates"
 DEFAULT_START = "2021-01-01"
 
 
 def fetch_rates(base: str, symbol: str, start: str, end: str) -> pd.DataFrame:
-    url = f"{BASE_URL}/{start}..{end}"
     response = requests.get(
-        url,
-        params={"base": base, "symbols": symbol},
+        BASE_URL,
+        params={
+            "base": base,
+            "quotes": symbol,
+            "from": start,
+            "to": end,
+        },
         timeout=30,
     )
     response.raise_for_status()
     payload = response.json()
 
-    rates = payload.get("rates", {})
+    if not isinstance(payload, list):
+        raise RuntimeError("Frankfurter returned an unexpected response format")
+
     rows = [
-        {"date": day, "exchange_rate": values[symbol]}
-        for day, values in rates.items()
-        if symbol in values
+        {"date": item["date"], "exchange_rate": item["rate"]}
+        for item in payload
+        if item.get("base") == base
+        and item.get("quote") == symbol
+        and item.get("rate") is not None
     ]
 
     if not rows:
@@ -41,6 +49,16 @@ def fetch_rates(base: str, symbol: str, start: str, end: str) -> pd.DataFrame:
     if (df["exchange_rate"] <= 0).any():
         raise ValueError("Dataset contains non-positive exchange rates")
 
+    expected_start = date.fromisoformat(start)
+    expected_end = date.fromisoformat(end)
+    if df["date"].min() > expected_start:
+        print(
+            "Warning: source has no observation at the requested start date; "
+            f"first available observation is {df['date'].min()}"
+        )
+    if df["date"].max() > expected_end:
+        raise ValueError("Source returned data beyond the requested end date")
+
     return df
 
 
@@ -50,10 +68,7 @@ def main() -> None:
     parser.add_argument("--symbol", default="INR")
     parser.add_argument("--start", default=DEFAULT_START)
     parser.add_argument("--end", default=date.today().isoformat())
-    parser.add_argument(
-        "--output",
-        default="data/raw/forex_rates.csv",
-    )
+    parser.add_argument("--output", default="data/raw/forex_rates.csv")
     args = parser.parse_args()
 
     df = fetch_rates(args.base.upper(), args.symbol.upper(), args.start, args.end)
