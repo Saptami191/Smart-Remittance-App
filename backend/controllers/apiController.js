@@ -1,7 +1,11 @@
 const axios = require('axios');
 const Prediction = require('../models/Prediction');
 
-const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL;
+
+if (!ML_SERVICE_URL) {
+    throw new Error('ML_SERVICE_URL is not configured');
+}
 
 exports.getBestRoute = async (req, res) => {
     try {
@@ -24,7 +28,6 @@ exports.getForecast = async (req, res) => {
         const response = await axios.post(`${ML_SERVICE_URL}/forecast`, payload);
         const data = response.data;
 
-        // Persist to MongoDB History
         try {
             await Prediction.create({
                 pair: data.pair,
