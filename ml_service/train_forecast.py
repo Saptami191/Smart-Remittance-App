@@ -36,15 +36,10 @@ def load_data(path: str) -> pd.DataFrame:
     return df[["ds", "y"]].reset_index(drop=True)
 
 
-def evaluate_window(
-    train: pd.DataFrame,
-    test: pd.DataFrame,
-) -> dict[str, float]:
+def evaluate_window(train: pd.DataFrame, test: pd.DataFrame) -> dict[str, float]:
     model = Prophet(daily_seasonality=True, interval_width=0.95)
     model.fit(train)
 
-    # Predict only on real observation dates. This avoids inventing weekend
-    # FX observations when the source dataset contains business-day rates.
     forecast = model.predict(test[["ds"]])
     predicted = forecast["yhat"].to_numpy()
     actual = test["y"].to_numpy()
@@ -53,7 +48,6 @@ def evaluate_window(
     rmse = mean_squared_error(actual, predicted) ** 0.5
     mape = abs((actual - predicted) / actual).mean() * 100
 
-    # Stronger baseline: keep the most recently observed rate constant.
     baseline = [train["y"].iloc[-1]] * len(test)
     baseline_mae = mean_absolute_error(actual, baseline)
 
@@ -67,11 +61,7 @@ def evaluate_window(
     }
 
 
-def rolling_backtest(
-    df: pd.DataFrame,
-    folds: int,
-    horizon: int,
-) -> dict:
+def rolling_backtest(df: pd.DataFrame, folds: int, horizon: int) -> dict:
     if folds < 2:
         raise ValueError("At least 2 backtest folds are required")
     if horizon < 5:
@@ -81,8 +71,7 @@ def rolling_backtest(
     required = minimum_training + folds * horizon
     if len(df) < required:
         raise ValueError(
-            f"Need at least {required} observations for {folds} folds of "
-            f"{horizon} observations"
+            f"Need at least {required} observations for {folds} folds of {horizon} observations"
         )
 
     results: list[dict] = []
@@ -108,14 +97,14 @@ def rolling_backtest(
     mean_mae = sum(item["mae"] for item in results) / len(results)
     mean_rmse = sum(item["rmse"] for item in results) / len(results)
     mean_mape = sum(item["mape_percent"] for item in results) / len(results)
-    mean_baseline_mae = sum(
-        item["naive_baseline_mae"] for item in results
-    ) / len(results)
+    mean_baseline_mae = sum(item["naive_baseline_mae"] for item in results) / len(results)
+    folds_won = sum(item["beats_naive_baseline"] for item in results)
 
     return {
         "folds": results,
         "fold_count": len(results),
         "horizon_observations": horizon,
+        "folds_won": folds_won,
         "mean_mae": round(mean_mae, 6),
         "mean_rmse": round(mean_rmse, 6),
         "mean_mape_percent": round(mean_mape, 4),
@@ -125,9 +114,7 @@ def rolling_backtest(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Train and validate SmartRemit FX forecast model"
-    )
+    parser = argparse.ArgumentParser(description="Train and validate SmartRemit FX forecast model")
     parser.add_argument("--data", default=DEFAULT_DATA)
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--metadata", default=DEFAULT_METADATA)
@@ -140,10 +127,21 @@ def main() -> None:
     df = load_data(args.data)
     backtest_metrics = rolling_backtest(df, args.folds, args.horizon)
 
+    # Always print the complete diagnostics before deciding whether to promote.
+    metadata = {
+        "model_type": "prophet",
+        "from_currency": args.from_currency.upper(),
+        "to_currency": args.to_currency.upper(),
+        "training_observations": len(df),
+        "training_start": df["ds"].min().date().isoformat(),
+        "training_end": df["ds"].max().date().isoformat(),
+        "backtest": backtest_metrics,
+    }
+    print(json.dumps(metadata, indent=2))
+
     if not backtest_metrics["beats_naive_baseline"]:
         raise RuntimeError(
-            "Prophet did not beat the naive baseline across rolling backtests; "
-            "refusing to promote the model"
+            "Prophet did not beat the naive baseline across rolling backtests; refusing to promote the model"
         )
 
     final_model = Prophet(daily_seasonality=True, interval_width=0.95)
@@ -155,18 +153,7 @@ def main() -> None:
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
 
     joblib.dump(final_model, model_path)
-    metadata = {
-        "model_type": "prophet",
-        "from_currency": args.from_currency.upper(),
-        "to_currency": args.to_currency.upper(),
-        "training_observations": len(df),
-        "training_start": df["ds"].min().date().isoformat(),
-        "training_end": df["ds"].max().date().isoformat(),
-        "backtest": backtest_metrics,
-    }
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
-    print(json.dumps(metadata, indent=2))
     print(f"Saved model to {model_path}")
 
 
