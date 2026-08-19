@@ -1,0 +1,47 @@
+name: Forecast Data and Model Validation
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "30 2 * * 1-5"
+
+jobs:
+  train-forecast:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ml_service/requirements.txt
+
+      - name: Install ML dependencies
+        run: python -m pip install -r ml_service/requirements.txt
+
+      - name: Fetch historical USD/INR data
+        run: |
+          python ml_service/ingest_fx_data.py \
+            --base USD \
+            --symbol INR \
+            --start 2021-01-01 \
+            --output data/raw/forex_rates.csv
+
+      - name: Validate dataset and train model
+        run: |
+          python ml_service/train_forecast.py \
+            --data data/raw/forex_rates.csv \
+            --from-currency USD \
+            --to-currency INR
+
+      - name: Upload training artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: usd-inr-forecast-model
+          path: |
+            ml_model/forecast_model.joblib
+            ml_model/forecast_model_metadata.json
+          retention-days: 14
