@@ -29,7 +29,7 @@ def load_data(path: str) -> pd.DataFrame:
     df = df.dropna().drop_duplicates("ds").sort_values("ds")
 
     if len(df) < 100:
-        raise ValueError("At least 100 daily observations are required for training")
+        raise ValueError("At least 100 observations are required for training")
     if (df["y"] <= 0).any():
         raise ValueError("Exchange rates must be positive")
 
@@ -46,15 +46,18 @@ def backtest(df: pd.DataFrame, validation_fraction: float) -> dict[str, float]:
 
     model = Prophet(daily_seasonality=True, interval_width=0.95)
     model.fit(train)
-    forecast = model.predict(model.make_future_dataframe(periods=len(test), include_history=False))
+
+    # Predict on the actual validation dates. This avoids inventing weekend
+    # observations when the source dataset contains business-day FX rates.
+    forecast = model.predict(test[["ds"]])
     predicted = forecast["yhat"].to_numpy()
     actual = test["y"].to_numpy()
 
     mae = mean_absolute_error(actual, predicted)
     rmse = mean_squared_error(actual, predicted) ** 0.5
-    mape = (abs((actual - predicted) / actual).mean()) * 100
+    mape = abs((actual - predicted) / actual).mean() * 100
 
-    # Naive baseline: tomorrow's value equals the most recent training value.
+    # Naive baseline: every validation value equals the last training value.
     baseline = [train["y"].iloc[-1]] * len(test)
     baseline_mae = mean_absolute_error(actual, baseline)
 
