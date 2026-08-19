@@ -4,7 +4,10 @@ services:
     runtime: python
     rootDir: ml_service
     plan: free
-    buildCommand: pip install -r requirements.txt
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      python ingest_fx_data.py --base USD --symbol INR --start 2021-01-01 --output ../data/raw/forex_rates.csv &&
+      python train_forecast.py --data ../data/raw/forex_rates.csv --from-currency USD --to-currency INR
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
 
