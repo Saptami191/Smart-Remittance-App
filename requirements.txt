@@ -1,0 +1,3 @@
+# Compatibility requirements for Render's default Python service root.
+# SmartRemit's Python ML service dependencies are defined in ml_service/requirements.txt.
+# This file intentionally contains no dependencies because the Node backend is deployed separately.
