@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>StockVerse - Login / Signup</title>
+  <title>SmartRemit - Login / Signup</title>
   <link rel="stylesheet" href="style2.css" />
 </head>
 <body>
@@ -11,100 +11,160 @@
 
   <div class="card">
     <div class="toggle">
-      <button id="loginToggle" class="active">Login</button>
-      <button id="signupToggle">Sign Up</button>
+      <button id="loginToggle" class="active" type="button">Login</button>
+      <button id="signupToggle" type="button">Sign Up</button>
     </div>
 
     <form id="loginForm" class="form active-form">
       <h2>Welcome Back 👋</h2>
-      <input type="email" placeholder="Email" required />
-      <input type="password" placeholder="Password" required />
-      <button type="submit">Login</button>
+      <input id="loginEmail" type="email" placeholder="Email" autocomplete="email" required />
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password" required />
+      <button id="loginButton" type="submit">Login</button>
+      <p id="loginMessage" class="auth-message" role="alert"></p>
     </form>
 
     <form id="signupForm" class="form">
       <h2>Create an Account 🚀</h2>
-      <input type="text" placeholder="Username" required />
-      <input type="email" placeholder="Email" required />
-      <input type="password" placeholder="Password" required />
-      <button type="submit">Sign Up</button>
+      <input id="signupUsername" type="text" placeholder="Username" autocomplete="username" minlength="2" required />
+      <input id="signupEmail" type="email" placeholder="Email" autocomplete="email" required />
+      <input id="signupPassword" type="password" placeholder="Password (min 8 characters)" autocomplete="new-password" minlength="8" required />
+      <button id="signupButton" type="submit">Sign Up</button>
+      <p id="signupMessage" class="auth-message" role="alert"></p>
     </form>
   </div>
 
   <script>
+    // Production API is deployed separately from the static frontend.
+    // Override this from the browser before loading the page if needed:
+    // window.SMARTREMIT_API_URL = 'https://your-api.example.com';
+    const API_BASE_URL = (window.SMARTREMIT_API_URL || 'https://smartremit-api.onrender.com').replace(/\/$/, '');
+
     const loginToggle = document.getElementById('loginToggle');
     const signupToggle = document.getElementById('signupToggle');
     const loginForm = document.getElementById('loginForm');
     const signupForm = document.getElementById('signupForm');
+    const loginButton = document.getElementById('loginButton');
+    const signupButton = document.getElementById('signupButton');
+    const loginMessage = document.getElementById('loginMessage');
+    const signupMessage = document.getElementById('signupMessage');
 
-    // Toggle logic
-    loginToggle.addEventListener('click', () => {
+    function setMessage(element, message, type = 'error') {
+      element.textContent = message || '';
+      element.dataset.type = type;
+    }
+
+    function setLoading(button, loading, label) {
+      button.disabled = loading;
+      button.textContent = loading ? 'Please wait…' : label;
+    }
+
+    function showLogin() {
       loginForm.classList.add('active-form');
       signupForm.classList.remove('active-form');
       loginToggle.classList.add('active');
       signupToggle.classList.remove('active');
-    });
+      setMessage(loginMessage, '');
+      setMessage(signupMessage, '');
+    }
 
-    signupToggle.addEventListener('click', () => {
+    function showSignup() {
       signupForm.classList.add('active-form');
       loginForm.classList.remove('active-form');
       signupToggle.classList.add('active');
       loginToggle.classList.remove('active');
-    });
+      setMessage(loginMessage, '');
+      setMessage(signupMessage, '');
+    }
 
-    // Login logic
+    loginToggle.addEventListener('click', showLogin);
+    signupToggle.addEventListener('click', showSignup);
+
+    async function apiRequest(path, options = {}) {
+      const response = await fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers || {})
+        }
+      });
+
+      const text = await response.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(`Server returned an invalid response (${response.status})`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || `Request failed (${response.status})`);
+      }
+
+      return data;
+    }
+
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const email = e.target[0].value;
-      const password = e.target[1].value;
+      setMessage(loginMessage, '');
+
+      const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const password = document.getElementById('loginPassword').value;
+
+      setLoading(loginButton, true, 'Login');
 
       try {
-        const res = await fetch('/api/login', {
+        const data = await apiRequest('/api/login', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        const data = await res.json();
-        
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-          localStorage.setItem('username', data.username);
-          window.location.href = '/dashboard.html';
-        } else {
-          alert('Login failed: ' + (data.error || 'Server error'));
-        }
+
+        if (!data.token) throw new Error('Login succeeded but no authentication token was returned.');
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.username || email.split('@')[0]);
+        window.location.href = 'dashboard.html';
       } catch (err) {
-        alert('Fetch error: ' + err.message);
+        console.error('Login error:', err);
+        setMessage(loginMessage, err.message || 'Unable to login. Please try again.');
+      } finally {
+        setLoading(loginButton, false, 'Login');
       }
     });
 
-    // Signup logic
     signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const username = e.target[0].value;
-      const email = e.target[1].value;
-      const password = e.target[2].value;
+      setMessage(signupMessage, '');
+
+      const username = document.getElementById('signupUsername').value.trim();
+      const email = document.getElementById('signupEmail').value.trim().toLowerCase();
+      const password = document.getElementById('signupPassword').value;
+
+      if (password.length < 8) {
+        setMessage(signupMessage, 'Password must be at least 8 characters.');
+        return;
+      }
+
+      setLoading(signupButton, true, 'Sign Up');
 
       try {
-        const res = await fetch('/api/signup', {
+        const data = await apiRequest('/api/signup', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, email, password })
         });
-        const data = await res.json();
-        
-        if (data.userId) {
-          alert('Signup successful! Please login.');
-          loginToggle.click(); // Switch to login form
-        } else {
-          alert('Signup failed: ' + (data.error || 'Server error'));
-        }
+
+        if (!data.userId) throw new Error('Signup succeeded but no user ID was returned.');
+
+        setMessage(signupMessage, 'Account created. You can now log in.', 'success');
+        document.getElementById('loginEmail').value = email;
+        document.getElementById('loginPassword').value = '';
+        setTimeout(showLogin, 700);
       } catch (err) {
-        alert('Fetch error: ' + err.message);
+        console.error('Signup error:', err);
+        setMessage(signupMessage, err.message || 'Unable to create your account. Please try again.');
+      } finally {
+        setLoading(signupButton, false, 'Sign Up');
       }
     });
   </script>
- 
-  
 </body>
 </html>
