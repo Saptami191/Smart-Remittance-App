@@ -19,7 +19,7 @@ Instead of simply displaying an exchange rate, SmartRemit combines historical FX
 
 | Resource | Link |
 |---|---|
-| 🌐 **Live Frontend** | [Open SmartRemit](https://smart-remittance-8zhfixe4t-saptami-tithis-projects.vercel.app/index2.html) |
+| 🌐 **Live Frontend** | [Open SmartRemit](https://smart-remittance-app.vercel.app) |
 | ⚙️ **Production API** | [smartremit-api.onrender.com](https://smartremit-api.onrender.com) |
 | 🤖 **ML Service** | [smartremit-ml.onrender.com](https://smartremit-ml.onrender.com) |
 | 💻 **GitHub Repository** | [Saptami191/Smart-Remittance-App](https://github.com/Saptami191/Smart-Remittance-App) |
