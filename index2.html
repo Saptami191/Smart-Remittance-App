@@ -34,9 +34,9 @@
   </div>
 
   <script>
-    // Vercel proxies /api/* to the Render backend via vercel.json.
-    // This keeps the browser on the same origin and avoids CORS/deployment URL problems.
-    const API_BASE_URL = window.SMARTREMIT_API_URL || '';
+    // Use the deployed Render API directly. The backend has CORS enabled,
+    // so authentication does not depend on a Vercel rewrite/proxy.
+    const API_BASE_URL = 'https://smartremit-api.onrender.com';
 
     const loginToggle = document.getElementById('loginToggle');
     const signupToggle = document.getElementById('signupToggle');
@@ -79,24 +79,31 @@
     signupToggle.addEventListener('click', showSignup);
 
     async function apiRequest(path, options = {}) {
-      const response = await fetch(`${API_BASE_URL}${path}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(options.headers || {})
-        }
-      });
+      let response;
+      try {
+        response = await fetch(`${API_BASE_URL}${path}`, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+          }
+        });
+      } catch (networkError) {
+        throw new Error('Cannot reach the SmartRemit API. The Render backend may still be starting.');
+      }
 
       const text = await response.text();
       let data = {};
+
       try {
         data = text ? JSON.parse(text) : {};
       } catch {
-        throw new Error(`Server returned an invalid response (${response.status})`);
+        const preview = text.replace(/\s+/g, ' ').slice(0, 120);
+        throw new Error(`API returned non-JSON response (${response.status}): ${preview}`);
       }
 
       if (!response.ok) {
-        throw new Error(data.error || `Request failed (${response.status})`);
+        throw new Error(data.error || data.message || `Request failed (${response.status})`);
       }
 
       return data;
