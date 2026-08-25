@@ -34,10 +34,9 @@
   </div>
 
   <script>
-    // Production API is deployed separately from the static frontend.
-    // Override this from the browser before loading the page if needed:
-    // window.SMARTREMIT_API_URL = 'https://your-api.example.com';
-    const API_BASE_URL = (window.SMARTREMIT_API_URL || 'https://smartremit-api.onrender.com').replace(/\/$/, '');
+    // Vercel proxies /api/* to the Render backend via vercel.json.
+    // This keeps the browser on the same origin and avoids CORS/deployment URL problems.
+    const API_BASE_URL = window.SMARTREMIT_API_URL || '';
 
     const loginToggle = document.getElementById('loginToggle');
     const signupToggle = document.getElementById('signupToggle');
